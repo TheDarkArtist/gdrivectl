@@ -2,14 +2,10 @@
 
 CLI tool to manage Google Docs permissions in bulk — grant, revoke, audit.
 
-## Google Cloud Setup (one-time)
+## Prerequisites
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use existing)
-3. Enable **Google Drive API** (APIs & Services → Library)
-4. Create **OAuth 2.0 credentials** (APIs & Services → Credentials → Create → OAuth client ID → Desktop app)
-5. Download the JSON file
-6. Save it to `~/.config/tda-gdrivectl/credentials.json`
+- Python 3.10+
+- [gcloud CLI](https://cloud.google.com/sdk/docs/install) (for automated setup)
 
 ## Install
 
@@ -18,10 +14,25 @@ cd ~/Workspace/Projects/tda-gdrivectl
 pip install -e .
 ```
 
+## First-time Setup
+
+```bash
+tda-gdrivectl setup
+```
+
+This interactively walks you through:
+1. gcloud login
+2. GCP project creation (or selection)
+3. Enabling Drive API
+4. OAuth consent screen configuration (opens browser)
+5. OAuth client credential creation (opens browser)
+6. Auto-detects downloaded `credentials.json` from `~/Downloads`
+7. Runs the OAuth auth flow
+
 ## Usage
 
 ```bash
-# Authenticate (opens browser for OAuth)
+# Re-authenticate if token expires
 tda-gdrivectl auth
 
 # List all your Google Docs
