@@ -1,8 +1,6 @@
 import time
-from typing import Optional
 
 from googleapiclient.discovery import build
-from googleapiclient.http import BatchHttpRequest
 from google.oauth2.credentials import Credentials
 from rich.console import Console
 
@@ -10,7 +8,6 @@ from tda_gdrivectl.config import (
     DOCS_QUERY,
     DRIVE_FIELDS,
     BATCH_SIZE,
-    OWNER_EMAIL,
 )
 
 console = Console()
@@ -165,11 +162,11 @@ def revoke_permissions(
     return results
 
 
-def non_owner_permissions(permissions: list[dict]) -> list[dict]:
+def non_owner_permissions(permissions: list[dict], owner_email: str) -> list[dict]:
     """Filter out owner permissions."""
     return [
         p
         for p in permissions
-        if p.get("emailAddress", "").lower() != OWNER_EMAIL.lower()
+        if p.get("emailAddress", "").lower() != owner_email.lower()
         and p.get("role") != "owner"
     ]

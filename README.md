@@ -2,6 +2,8 @@
 
 CLI tool to manage Google Docs permissions in bulk — grant, revoke, audit.
 
+Interactive prompts, dry-run by default, owner protection built in.
+
 ## Prerequisites
 
 - Python 3.10+
@@ -10,8 +12,14 @@ CLI tool to manage Google Docs permissions in bulk — grant, revoke, audit.
 ## Install
 
 ```bash
-cd ~/Workspace/Projects/tda-gdrivectl
+git clone https://github.com/TheDarkArtist/tda-gdrivectl.git
+cd tda-gdrivectl
 pip install -e .
+```
+
+Or install directly:
+```bash
+pip install git+https://github.com/TheDarkArtist/tda-gdrivectl.git
 ```
 
 ## First-time Setup
@@ -22,12 +30,14 @@ tda-gdrivectl setup
 
 This interactively walks you through:
 1. gcloud login
-2. GCP project creation (or selection)
-3. Enabling Drive API
-4. OAuth consent screen configuration (opens browser)
-5. OAuth client credential creation (opens browser)
-6. Auto-detects downloaded `credentials.json` from `~/Downloads`
-7. Runs the OAuth auth flow
+2. Owner email configuration (protected from accidental revocation)
+3. GCP project creation (or selection)
+4. Enabling Google Drive API
+5. OAuth consent screen configuration (opens browser)
+6. OAuth client credential creation (opens browser, auto-detects download)
+7. OAuth authentication flow
+
+All config is stored in `~/.config/tda-gdrivectl/`.
 
 ## Usage
 
@@ -57,7 +67,20 @@ tda-gdrivectl audit
 
 ## Safety
 
-- **Dry-run by default** — grant/revoke print what would happen without `--execute`
-- **Owner protection** — your email is never shown as revocable
-- **Confirmation prompt** — always confirms before executing
-- **Audit log** — every run logs to `logs/`
+- **Dry-run by default** — grant/revoke show what would happen without `--execute`
+- **Owner protection** — your email is never shown as revocable, hardcoded during setup
+- **Confirmation prompt** — always confirms before executing changes
+- **Audit log** — every grant/revoke run logs results to `logs/`
+
+## Config Location
+
+```
+~/.config/tda-gdrivectl/
+├── config.json        # owner email, settings
+├── credentials.json   # OAuth client credentials (from GCP)
+└── token.json         # OAuth token (auto-generated)
+```
+
+## License
+
+MIT

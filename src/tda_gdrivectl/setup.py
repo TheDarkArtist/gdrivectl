@@ -9,7 +9,7 @@ import questionary
 from rich.console import Console
 from rich.panel import Panel
 
-from tda_gdrivectl.config import CONFIG_DIR, CREDENTIALS_FILE
+from tda_gdrivectl.config import CONFIG_DIR, CREDENTIALS_FILE, save_config
 
 console = Console()
 
@@ -206,22 +206,32 @@ def run_setup():
         console.print("[red]Login failed.[/red]")
         raise SystemExit(1)
 
-    # 3. Project
+    # 3. Owner email (used for safety — never revoke your own access)
+    owner_email = questionary.text(
+        "Your Google email (owner — will be protected from revocation):",
+        default=account,
+    ).ask()
+    if not owner_email:
+        raise SystemExit(1)
+    save_config({"owner_email": owner_email})
+    console.print(f"[green]\u2713[/green] Owner email saved: [cyan]{owner_email}[/cyan]")
+
+    # 4. Project
     project_id = _create_or_select_project()
     if not project_id:
         console.print("[red]No project selected.[/red]")
         raise SystemExit(1)
 
-    # 4. Enable API
+    # 5. Enable API
     _enable_drive_api(project_id)
 
-    # 5. Consent screen
+    # 6. Consent screen
     _setup_consent_screen(project_id)
 
-    # 6. Credentials
+    # 7. Credentials
     creds_ok = _setup_credentials(project_id)
 
-    # 7. Auth flow
+    # 8. Auth flow
     if creds_ok and CREDENTIALS_FILE.exists():
         console.print("\n[dim]Running OAuth flow...[/dim]")
         from tda_gdrivectl.auth import authenticate

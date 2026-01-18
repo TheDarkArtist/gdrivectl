@@ -2,9 +2,9 @@ import click
 import questionary
 from rich.console import Console
 from rich.table import Table
-from rich.progress import track
 
 from tda_gdrivectl.auth import authenticate, require_auth
+from tda_gdrivectl.config import get_owner_email
 from tda_gdrivectl.drive import (
     list_docs,
     get_permissions,
@@ -13,9 +13,17 @@ from tda_gdrivectl.drive import (
     non_owner_permissions,
 )
 from tda_gdrivectl.audit import export_permissions_csv, log_action
-from tda_gdrivectl.config import OWNER_EMAIL
 
 console = Console()
+
+
+def _owner() -> str:
+    """Get owner email from config, exit if not set."""
+    email = get_owner_email()
+    if not email:
+        console.print("[red]Owner email not configured. Run:[/red] tda-gdrivectl setup")
+        raise SystemExit(1)
+    return email
 
 
 @click.group()
@@ -42,6 +50,7 @@ def auth():
 def list_cmd(shared_only):
     """List all Google Docs you own."""
     creds = require_auth()
+    owner = _owner()
     console.print("[dim]Fetching docs...[/dim]")
     docs = list_docs(creds, shared_only=shared_only)
 
@@ -57,7 +66,7 @@ def list_cmd(shared_only):
 
     for doc in docs:
         perms = doc.get("permissions", [])
-        share_count = len(non_owner_permissions(perms))
+        share_count = len(non_owner_permissions(perms, owner))
         table.add_row(
             doc["name"],
             doc.get("modifiedTime", "")[:10],
@@ -74,6 +83,7 @@ def list_cmd(shared_only):
 def inspect(doc_id, doc_name):
     """Inspect permissions on a specific doc."""
     creds = require_auth()
+    owner = _owner()
 
     if not doc_id:
         docs = list_docs(creds)
@@ -86,7 +96,6 @@ def inspect(doc_id, doc_name):
         ]
 
         if doc_name:
-            # Filter choices by name
             choices = [c for c in choices if doc_name.lower() in c.title.lower()]
             if not choices:
                 console.print(f"[red]No docs matching '{doc_name}'[/red]")
@@ -109,7 +118,7 @@ def inspect(doc_id, doc_name):
     table.add_column("Permission ID", style="dim")
 
     for p in perms:
-        is_owner = p.get("emailAddress", "").lower() == OWNER_EMAIL.lower()
+        is_owner = p.get("emailAddress", "").lower() == owner.lower()
         style = "bold" if is_owner else ""
         table.add_row(
             p.get("emailAddress", p.get("type", "unknown")),
@@ -222,6 +231,7 @@ def grant(execute):
 def revoke(execute):
     """Revoke access from Google Docs (interactive)."""
     creds = require_auth()
+    owner = _owner()
     docs = list_docs(creds)
     if not docs:
         console.print("[yellow]No docs found.[/yellow]")
@@ -229,7 +239,7 @@ def revoke(execute):
 
     # Only show docs that have shared permissions
     shared_docs = [
-        d for d in docs if non_owner_permissions(d.get("permissions", []))
+        d for d in docs if non_owner_permissions(d.get("permissions", []), owner)
     ]
     if not shared_docs:
         console.print("[yellow]No docs with shared permissions found.[/yellow]")
@@ -238,7 +248,7 @@ def revoke(execute):
     # Pick docs
     choices = [
         questionary.Choice(
-            title=f"{d['name']} ({len(non_owner_permissions(d.get('permissions', [])))} shared)",
+            title=f"{d['name']} ({len(non_owner_permissions(d.get('permissions', []), owner))} shared)",
             value=d["id"],
         )
         for d in shared_docs
@@ -256,7 +266,7 @@ def revoke(execute):
     selected_docs = [d for d in shared_docs if d["id"] in selected_ids]
     all_emails = set()
     for doc in selected_docs:
-        for p in non_owner_permissions(doc.get("permissions", [])):
+        for p in non_owner_permissions(doc.get("permissions", []), owner):
             email = p.get("emailAddress", "")
             if email:
                 all_emails.add(email)
@@ -287,10 +297,9 @@ def revoke(execute):
 
     # Build revocation list
     revocations = []
-    id_to_name = {d["id"]: d["name"] for d in docs}
 
     for doc in selected_docs:
-        for p in non_owner_permissions(doc.get("permissions", [])):
+        for p in non_owner_permissions(doc.get("permissions", []), owner):
             email = p.get("emailAddress", "")
             if email in target_emails:
                 revocations.append(
