@@ -12,8 +12,9 @@ token.json
 credentials.json
 config.json
 
-# Logs (local only)
-logs/
+# Logs (local only, keep dir structure)
+logs/*
+!logs/.gitkeep
 
 # Virtualenv
 .venv/
