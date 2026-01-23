@@ -7,7 +7,8 @@ Interactive prompts, dry-run by default, owner protection built in.
 ## Prerequisites
 
 - Python 3.10+
-- [gcloud CLI](https://cloud.google.com/sdk/docs/install) (for automated setup)
+- A Google account
+- A web browser
 
 ## Install
 

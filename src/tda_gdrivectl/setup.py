@@ -1,7 +1,6 @@
 import glob
 import json
 import shutil
-import subprocess
 import webbrowser
 from pathlib import Path
 
@@ -13,116 +12,96 @@ from tda_gdrivectl.config import CONFIG_DIR, CREDENTIALS_FILE, save_config
 
 console = Console()
 
+CONSOLE_URL = "https://console.cloud.google.com"
 
-def _run(cmd, capture=True):
-    """Run a shell command. Returns stdout on success, None on failure."""
+
+def _open_browser(url):
+    """Open URL in browser, handle failures gracefully."""
     try:
-        r = subprocess.run(cmd, capture_output=capture, text=True, check=True)
-        return r.stdout.strip() if capture else ""
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return None
-
-
-def _check_gcloud():
-    if shutil.which("gcloud"):
-        console.print("[green]\u2713[/green] gcloud CLI found")
+        webbrowser.open(url)
         return True
-    console.print("[red]gcloud CLI not installed.[/red]")
-    console.print("Install: https://cloud.google.com/sdk/docs/install")
-    if questionary.confirm("Open install page?", default=True).ask():
-        webbrowser.open("https://cloud.google.com/sdk/docs/install")
-    console.print("After installing, run [bold]tda-gdrivectl setup[/bold] again.")
-    return False
+    except Exception:
+        console.print(f"[dim]Could not open browser. Go to:[/dim]\n{url}")
+        return False
 
 
-def _gcloud_login():
-    """Ensure gcloud is logged in. Returns account email or None."""
-    account = _run(["gcloud", "config", "get-value", "account"])
-    if account and "@" in account:
-        console.print(f"[green]\u2713[/green] Logged in as [cyan]{account}[/cyan]")
-        if questionary.confirm(f"Continue as {account}?", default=True).ask():
-            return account
-
-    console.print("[dim]Opening browser for Google login...[/dim]")
-    _run(["gcloud", "auth", "login"], capture=False)
-    account = _run(["gcloud", "config", "get-value", "account"])
-    if account and "@" in account:
-        console.print(f"[green]\u2713[/green] Logged in as [cyan]{account}[/cyan]")
-        return account
-    return None
-
-
-def _create_or_select_project():
-    """Create a new GCP project or select existing one. Returns project ID."""
-    action = questionary.select(
-        "GCP project:",
-        choices=[
-            questionary.Choice("Create new project", "new"),
-            questionary.Choice("Use existing project", "existing"),
-        ],
-    ).ask()
-
-    if action == "new":
-        pid = questionary.text("Project ID (lowercase, hyphens ok):", default="tda-gdrivectl").ask()
-        if not pid:
-            return None
-        console.print(f"[dim]Creating project '{pid}'...[/dim]")
-        result = _run(["gcloud", "projects", "create", pid])
-        if result is None:
-            console.print("[yellow]Creation failed — project may already exist.[/yellow]")
-            if not questionary.confirm(f"Try using '{pid}' anyway?", default=True).ask():
-                return None
-        else:
-            console.print(f"[green]\u2713[/green] Project created: {pid}")
-        _run(["gcloud", "config", "set", "project", pid])
-        return pid
-
-    # List existing projects
-    out = _run(["gcloud", "projects", "list", "--format=value(projectId)"])
-    if not out:
-        console.print("[red]No projects found.[/red]")
-        return None
-    projects = [p.strip() for p in out.splitlines() if p.strip()]
-    pid = questionary.select("Select project:", choices=projects).ask()
-    if pid:
-        _run(["gcloud", "config", "set", "project", pid])
-        console.print(f"[green]\u2713[/green] Project: {pid}")
-    return pid
-
-
-def _enable_drive_api(project_id):
-    """Enable Google Drive API on the project."""
-    console.print("[dim]Enabling Drive API...[/dim]")
-    if _run(["gcloud", "services", "enable", "drive.googleapis.com", f"--project={project_id}"]) is not None:
-        console.print("[green]\u2713[/green] Drive API enabled")
-        return
-    console.print("[yellow]Auto-enable failed. Opening browser...[/yellow]")
-    url = f"https://console.cloud.google.com/apis/library/drive.googleapis.com?project={project_id}"
-    webbrowser.open(url)
-    questionary.confirm("Done enabling Drive API?", default=True).ask()
-
-
-def _setup_consent_screen(project_id):
-    """Guide user through OAuth consent screen setup."""
+def _step_owner_email():
+    """Ask for the owner's Google email."""
     console.print(Panel(
-        "[bold]OAuth Consent Screen[/bold]\n\n"
-        "1. User type: [bold]External[/bold]\n"
-        "2. App name: [bold]tda-gdrivectl[/bold]\n"
-        "3. Support email + developer email: [bold]your email[/bold]\n"
-        "4. Scopes: skip (no scopes needed here)\n"
-        "5. Test users: [bold]add your Google email[/bold]\n"
-        "6. Save through all steps",
-        title="Configure in browser",
+        "Which Google account owns the docs you want to manage?\n"
+        "This email will be [bold]protected from accidental revocation[/bold].",
+        title="Step 1: Owner Email",
         style="blue",
     ))
-    url = f"https://console.cloud.google.com/apis/credentials/consent?project={project_id}"
-    webbrowser.open(url)
+    email = questionary.text("Your Google email:").ask()
+    if not email or "@" not in email:
+        console.print("[red]Invalid email.[/red]")
+        return None
+    save_config({"owner_email": email})
+    console.print(f"[green]\u2713[/green] Owner: [cyan]{email}[/cyan]")
+    return email
+
+
+def _step_create_project():
+    """Guide user to create a GCP project in the browser."""
+    console.print(Panel(
+        "1. Click [bold]Create Project[/bold] (or select an existing one)\n"
+        "2. Project name: anything you want (e.g. [bold]gdrivectl[/bold])\n"
+        "3. Click [bold]Create[/bold]\n"
+        "4. Wait for the notification that the project is ready",
+        title="Step 2: Create Google Cloud Project",
+        style="blue",
+    ))
+    _open_browser(f"{CONSOLE_URL}/projectcreate")
+    questionary.confirm("Project created?", default=True).ask()
+    project_id = questionary.text(
+        "Enter your project ID (shown under the project name in the console):"
+    ).ask()
+    if not project_id:
+        return None
+    project_id = project_id.strip()
+    console.print(f"[green]\u2713[/green] Project: [cyan]{project_id}[/cyan]")
+    save_config({"gcp_project_id": project_id})
+    return project_id
+
+
+def _step_enable_api(project_id):
+    """Guide user to enable Google Drive API."""
+    console.print(Panel(
+        "1. Make sure your project is selected in the top bar\n"
+        "2. Click [bold]Enable[/bold]",
+        title="Step 3: Enable Google Drive API",
+        style="blue",
+    ))
+    _open_browser(
+        f"{CONSOLE_URL}/apis/library/drive.googleapis.com?project={project_id}"
+    )
+    questionary.confirm("Drive API enabled?", default=True).ask()
+    console.print("[green]\u2713[/green] Drive API enabled")
+
+
+def _step_consent_screen(project_id):
+    """Guide user through OAuth consent screen setup."""
+    console.print(Panel(
+        "1. Select [bold]External[/bold] user type, click Create\n"
+        "2. App name: [bold]tda-gdrivectl[/bold]\n"
+        "3. User support email: [bold]your email[/bold]\n"
+        "4. Developer contact email: [bold]your email[/bold]\n"
+        "5. Click [bold]Save and Continue[/bold] through all remaining steps\n"
+        "6. On the Summary page, click [bold]Back to Dashboard[/bold]\n"
+        "7. Click [bold]Publish App[/bold] (or add your email under Test Users)",
+        title="Step 4: OAuth Consent Screen",
+        style="blue",
+    ))
+    _open_browser(
+        f"{CONSOLE_URL}/apis/credentials/consent?project={project_id}"
+    )
     questionary.confirm("Consent screen configured?", default=True).ask()
-    console.print("[green]\u2713[/green] Consent screen done")
+    console.print("[green]\u2713[/green] Consent screen configured")
 
 
-def _setup_credentials(project_id):
-    """Guide user through OAuth client creation and place credentials.json."""
+def _step_create_credentials(project_id):
+    """Guide user to create OAuth client credentials and place them."""
     if CREDENTIALS_FILE.exists():
         if not questionary.confirm(
             f"credentials.json already exists at {CREDENTIALS_FILE}. Replace?",
@@ -132,22 +111,25 @@ def _setup_credentials(project_id):
             return True
 
     console.print(Panel(
-        "[bold]Create OAuth Client[/bold]\n\n"
-        "1. Application type: [bold]Desktop app[/bold]\n"
-        "2. Name: [bold]tda-gdrivectl[/bold]\n"
-        "3. Click [bold]Create[/bold]\n"
-        "4. Click [bold]Download JSON[/bold] on the popup",
-        title="Configure in browser",
+        "1. Click [bold]+ Create Credentials[/bold] at the top\n"
+        "2. Select [bold]OAuth client ID[/bold]\n"
+        "3. Application type: [bold]Desktop app[/bold]\n"
+        "4. Name: [bold]tda-gdrivectl[/bold]\n"
+        "5. Click [bold]Create[/bold]\n"
+        "6. Click [bold]Download JSON[/bold] on the popup",
+        title="Step 5: Create OAuth Credentials",
         style="blue",
     ))
-    url = f"https://console.cloud.google.com/apis/credentials/oauthclient?project={project_id}"
-    webbrowser.open(url)
+    _open_browser(
+        f"{CONSOLE_URL}/apis/credentials?project={project_id}"
+    )
 
-    console.print("\n[dim]After downloading the JSON, provide its location below.[/dim]")
+    console.print("\n[dim]After downloading, press Enter to auto-detect "
+                   "or paste the file path.[/dim]")
     downloads = Path.home() / "Downloads"
 
     creds_input = questionary.text(
-        "Path to downloaded JSON (or directory to auto-detect):",
+        "Path to downloaded JSON (or press Enter to scan Downloads):",
         default=str(downloads),
     ).ask()
     if not creds_input:
@@ -188,54 +170,46 @@ def _setup_credentials(project_id):
     return True
 
 
+def _step_authenticate():
+    """Run the OAuth flow."""
+    if not CREDENTIALS_FILE.exists():
+        console.print(f"[red]credentials.json not found at {CREDENTIALS_FILE}[/red]")
+        return False
+    console.print("\n[dim]Opening browser for Google authorization...[/dim]")
+    from tda_gdrivectl.auth import authenticate
+    authenticate()
+    return True
+
+
 def run_setup():
     """Main setup flow — called by the CLI `setup` command."""
     console.print(Panel(
         "[bold]tda-gdrivectl Setup[/bold]\n"
-        "Creates GCP project, enables Drive API, configures OAuth.",
+        "5 steps, all in your browser. No extra tools needed.",
         style="blue",
     ))
 
-    # 1. gcloud CLI
-    if not _check_gcloud():
+    # 1. Owner email
+    owner = _step_owner_email()
+    if not owner:
         raise SystemExit(1)
 
-    # 2. Login
-    account = _gcloud_login()
-    if not account:
-        console.print("[red]Login failed.[/red]")
-        raise SystemExit(1)
-
-    # 3. Owner email (used for safety — never revoke your own access)
-    owner_email = questionary.text(
-        "Your Google email (owner — will be protected from revocation):",
-        default=account,
-    ).ask()
-    if not owner_email:
-        raise SystemExit(1)
-    save_config({"owner_email": owner_email})
-    console.print(f"[green]\u2713[/green] Owner email saved: [cyan]{owner_email}[/cyan]")
-
-    # 4. Project
-    project_id = _create_or_select_project()
+    # 2. GCP project
+    project_id = _step_create_project()
     if not project_id:
-        console.print("[red]No project selected.[/red]")
         raise SystemExit(1)
 
-    # 5. Enable API
-    _enable_drive_api(project_id)
+    # 3. Enable Drive API
+    _step_enable_api(project_id)
 
-    # 6. Consent screen
-    _setup_consent_screen(project_id)
+    # 4. Consent screen
+    _step_consent_screen(project_id)
 
-    # 7. Credentials
-    creds_ok = _setup_credentials(project_id)
+    # 5. OAuth credentials
+    creds_ok = _step_create_credentials(project_id)
 
-    # 8. Auth flow
-    if creds_ok and CREDENTIALS_FILE.exists():
-        console.print("\n[dim]Running OAuth flow...[/dim]")
-        from tda_gdrivectl.auth import authenticate
-        authenticate()
+    # 6. Authenticate
+    if creds_ok and _step_authenticate():
         console.print(Panel(
             "[bold green]Setup complete![/bold green]\n"
             "Run [bold]tda-gdrivectl list[/bold] to see your docs.",
