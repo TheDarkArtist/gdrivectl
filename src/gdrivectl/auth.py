@@ -4,8 +4,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from rich.console import Console
 
-from tda_gdrivectl.config import (
-    CREDENTIALS_FILE, TOKEN_FILE, SCOPES, CONFIG_DIR, save_config,
+from gdrivectl.config import (
+    CREDENTIALS_FILE, TOKEN_FILE, CONFIG_FILE, SCOPES, CONFIG_DIR, save_config,
 )
 
 console = Console()
@@ -57,9 +57,24 @@ def require_auth() -> Credentials:
     """Get credentials, failing if not authenticated."""
     creds = get_credentials()
     if not creds:
-        console.print("[red]Not authenticated. Run:[/red] tda-gdrivectl auth")
+        console.print("[red]Not authenticated. Run:[/red] gdrivectl auth login")
         raise SystemExit(1)
     return creds
+
+
+def logout():
+    """Remove stored token and config, logging the user out."""
+    removed = False
+    if TOKEN_FILE.exists():
+        TOKEN_FILE.unlink()
+        removed = True
+    if CONFIG_FILE.exists():
+        CONFIG_FILE.unlink()
+        removed = True
+    if removed:
+        console.print("[green]Logged out. Token and config removed.[/green]")
+    else:
+        console.print("[yellow]Not logged in — nothing to remove.[/yellow]")
 
 
 def _save_token(creds: Credentials):

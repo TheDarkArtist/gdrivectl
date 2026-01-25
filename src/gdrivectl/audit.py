@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from tda_gdrivectl.config import LOGS_DIR
+from gdrivectl.config import LOGS_DIR
 
 console = Console()
 

@@ -3,16 +3,16 @@ import questionary
 from rich.console import Console
 from rich.table import Table
 
-from tda_gdrivectl.auth import authenticate, require_auth
-from tda_gdrivectl.config import get_owner_email
-from tda_gdrivectl.drive import (
+from gdrivectl.auth import authenticate, require_auth, logout as do_logout, get_credentials
+from gdrivectl.config import get_owner_email
+from gdrivectl.drive import (
     list_docs,
     get_permissions,
     grant_permissions,
     revoke_permissions,
     non_owner_permissions,
 )
-from tda_gdrivectl.audit import export_permissions_csv, log_action
+from gdrivectl.audit import export_permissions_csv, log_action
 
 console = Console()
 
@@ -21,21 +21,44 @@ def _owner() -> str:
     """Get owner email from config, exit if not set."""
     email = get_owner_email()
     if not email:
-        console.print("[red]Owner email not configured. Run:[/red] tda-gdrivectl auth")
+        console.print("[red]Owner email not configured. Run:[/red] gdrivectl auth login")
         raise SystemExit(1)
     return email
 
 
 @click.group()
 def cli():
-    """tda-gdrivectl — Manage Google Docs permissions in bulk."""
+    """gdrivectl — Manage Google Docs permissions in bulk."""
     pass
 
 
-@cli.command()
+@cli.group()
 def auth():
+    """Manage authentication (login/logout)."""
+    pass
+
+
+@auth.command()
+def login():
     """Authenticate with Google (opens browser, one-time)."""
     authenticate()
+
+
+@auth.command()
+def logout():
+    """Log out and remove stored credentials."""
+    do_logout()
+
+
+@auth.command()
+def status():
+    """Check current authentication status."""
+    creds = get_credentials()
+    if creds:
+        owner = get_owner_email()
+        console.print(f"[green]Logged in as {owner}[/green]" if owner else "[green]Logged in.[/green]")
+    else:
+        console.print("[yellow]Not logged in.[/yellow]")
 
 
 @cli.command("list")

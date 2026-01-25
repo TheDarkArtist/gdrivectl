@@ -4,7 +4,7 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from rich.console import Console
 
-from tda_gdrivectl.config import (
+from gdrivectl.config import (
     DOCS_QUERY,
     DRIVE_FIELDS,
     BATCH_SIZE,

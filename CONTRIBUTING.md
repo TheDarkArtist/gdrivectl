@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/TheDarkArtist/tda-gdrivectl.git
-cd tda-gdrivectl
+git clone https://github.com/TheDarkArtist/gdrivectl.git
+cd gdrivectl
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -13,9 +13,9 @@ pip install -e .
 ## Project Structure
 
 ```
-src/tda_gdrivectl/
+src/gdrivectl/
 ├── __init__.py
-├── __main__.py        # python -m tda_gdrivectl
+├── __main__.py        # python -m gdrivectl
 ├── cli.py             # Click commands + interactive prompts
 ├── auth.py            # OAuth2 flow, token storage/refresh, owner detection
 ├── drive.py           # Google Drive API wrapper

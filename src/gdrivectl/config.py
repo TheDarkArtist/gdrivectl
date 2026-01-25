@@ -5,7 +5,7 @@ from pathlib import Path
 CREDENTIALS_FILE = Path(__file__).parent / "credentials.json"
 
 # Per-user config + tokens
-CONFIG_DIR = Path.home() / ".config" / "tda-gdrivectl"
+CONFIG_DIR = Path.home() / ".config" / "gdrivectl"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 TOKEN_FILE = CONFIG_DIR / "token.json"
 
