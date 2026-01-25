@@ -15,13 +15,13 @@ pip install -e .
 ```
 src/tda_gdrivectl/
 ├── __init__.py
-├── __main__.py    # python -m tda_gdrivectl
-├── cli.py         # Click commands + interactive prompts
-├── auth.py        # OAuth2 flow, token storage/refresh
-├── drive.py       # Google Drive API wrapper
-├── audit.py       # CSV export + action logging
-├── config.py      # Paths, constants, config load/save
-└── setup.py       # Guided GCP project + OAuth setup
+├── __main__.py        # python -m tda_gdrivectl
+├── cli.py             # Click commands + interactive prompts
+├── auth.py            # OAuth2 flow, token storage/refresh, owner detection
+├── drive.py           # Google Drive API wrapper
+├── audit.py           # CSV export + action logging
+├── config.py          # Paths, constants, config load/save
+└── credentials.json   # Bundled OAuth client ID (public, safe to ship)
 ```
 
 ## Adding a Command

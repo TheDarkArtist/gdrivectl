@@ -1,9 +1,12 @@
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 from rich.console import Console
 
-from tda_gdrivectl.config import CREDENTIALS_FILE, TOKEN_FILE, SCOPES, CONFIG_DIR
+from tda_gdrivectl.config import (
+    CREDENTIALS_FILE, TOKEN_FILE, SCOPES, CONFIG_DIR, save_config,
+)
 
 console = Console()
 
@@ -22,11 +25,11 @@ def get_credentials() -> Credentials:
 
 
 def authenticate() -> Credentials:
-    """Run full OAuth2 flow."""
+    """Run full OAuth2 flow. Auto-detects and saves owner email."""
     if not CREDENTIALS_FILE.exists():
         console.print(
             f"[red]credentials.json not found at {CREDENTIALS_FILE}[/red]\n"
-            "Download it from Google Cloud Console and place it there."
+            "This is a packaging error — the file should be bundled with the app."
         )
         raise SystemExit(1)
 
@@ -38,7 +41,15 @@ def authenticate() -> Credentials:
     flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_FILE), SCOPES)
     creds = flow.run_local_server(port=0)
     _save_token(creds)
-    console.print("[green]Authentication successful. Token saved.[/green]")
+
+    # Auto-detect and save owner email
+    email = _detect_email(creds)
+    if email:
+        save_config({"owner_email": email})
+        console.print(f"[green]Authenticated as {email}. Token saved.[/green]")
+    else:
+        console.print("[green]Authentication successful. Token saved.[/green]")
+
     return creds
 
 
@@ -54,3 +65,13 @@ def require_auth() -> Credentials:
 def _save_token(creds: Credentials):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     TOKEN_FILE.write_text(creds.to_json())
+
+
+def _detect_email(creds: Credentials) -> str | None:
+    """Get authenticated user's email from Drive API."""
+    try:
+        service = build("drive", "v3", credentials=creds)
+        about = service.about().get(fields="user(emailAddress)").execute()
+        return about["user"]["emailAddress"]
+    except Exception:
+        return None

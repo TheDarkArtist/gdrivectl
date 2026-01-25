@@ -21,7 +21,7 @@ def _owner() -> str:
     """Get owner email from config, exit if not set."""
     email = get_owner_email()
     if not email:
-        console.print("[red]Owner email not configured. Run:[/red] tda-gdrivectl setup")
+        console.print("[red]Owner email not configured. Run:[/red] tda-gdrivectl auth")
         raise SystemExit(1)
     return email
 
@@ -33,15 +33,8 @@ def cli():
 
 
 @cli.command()
-def setup():
-    """One-time Google Cloud project + OAuth setup."""
-    from tda_gdrivectl.setup import run_setup
-    run_setup()
-
-
-@cli.command()
 def auth():
-    """Authenticate with Google (OAuth2 flow)."""
+    """Authenticate with Google (opens browser, one-time)."""
     authenticate()
 
 

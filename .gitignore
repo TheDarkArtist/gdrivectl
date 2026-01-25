@@ -7,9 +7,8 @@ build/
 .eggs/
 *.egg
 
-# Secrets & user config — never commit
+# User secrets — never commit
 token.json
-credentials.json
 config.json
 
 # Logs (local only, keep dir structure)

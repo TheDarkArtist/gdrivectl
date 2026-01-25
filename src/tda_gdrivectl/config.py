@@ -1,10 +1,14 @@
 import json
 from pathlib import Path
 
+# Bundled with the package — public OAuth client ID (safe to ship)
+CREDENTIALS_FILE = Path(__file__).parent / "credentials.json"
+
+# Per-user config + tokens
 CONFIG_DIR = Path.home() / ".config" / "tda-gdrivectl"
 CONFIG_FILE = CONFIG_DIR / "config.json"
-CREDENTIALS_FILE = CONFIG_DIR / "credentials.json"
 TOKEN_FILE = CONFIG_DIR / "token.json"
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = PROJECT_DIR / "logs"
 
